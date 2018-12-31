@@ -1,5 +1,6 @@
 import * as esprima from 'esprima';
 import * as esgraph from 'esgraph';
+import * as escodegen from 'escodegen';
 
 const parseCode = (codeToParse) => {
     return esprima.parseScript(codeToParse);
@@ -8,11 +9,19 @@ const parseCode = (codeToParse) => {
 function createGraph(codeToParse) {
     let parsedCode = parseCode(codeToParse);
     let flowStruct = esgraph(parsedCode.body[0].body , { omitExceptions: true });
-    //createMergePoints(flowStruct);
+    addTypes(flowStruct);
     createMergePoints(flowStruct);
+    let colorAndShapeType = createColorShapeDict(flowStruct);
     let dotStruct = esgraph.dot(flowStruct, {counter: 0, source: parsedCode.body[0].body});
     return dotStruct;
 
+}
+
+function addTypes(flowStruct) {
+    flowStruct[2].map(node => {
+        if(!node.type)
+            node.type = escodegen.generate(node.astNode);
+    });
 }
 
 function createMergePoints(flowStruct){ //maybe need to update the next and prev fields of the nodes
@@ -35,11 +44,35 @@ function createMergePoints(flowStruct){ //maybe need to update the next and prev
     });
 }
 
+function createColorShapeDict(flowStruct) {
+    let dict = {};
+    for(let i=0; i<flowStruct[2].length; i++)
+        dict[i] = ['white' , determineShape(flowStruct[2][i])];
+    return dict;
+}
+
+function determineShape(node) {
+    if(shouldBeDiamond(node))
+        return 'diamond';
+    if(shouldBeCircle(node))
+        return 'circle';
+    else
+        return 'rectangle';
+}
+
+function shouldBeDiamond(node){
+    return (node.parent && (node.parent.type==='WhileStatement' || node.parent.type==='IfStatement'));
+}
+
+function shouldBeCircle(node) {
+    return node.type===' ';
+}
+
 function determineType(node) {
     if(node.parent.type==='WhileStatement')
-        return 'While';
+        return 'NULL';
     else
-        return 'If';
+        return ' ';
 }
 
 function updateNextField(x , node , mergePoint) {
